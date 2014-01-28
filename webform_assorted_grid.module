@@ -1,0 +1,109 @@
+<?php
+/**
+ * 
+ * Implementation of hook_theme().
+ */
+function webform_assorted_grid_theme() {
+  $theme = array(
+    'webform_form' => array(
+      'render element' => 'form',
+      'template' => 'webform-form',
+      'pattern' => 'webform_form_[0-9]+',
+    ),
+  );
+  return $theme;
+}
+
+/**
+ * 
+ * Get fieldset components of node with details
+ * @param $node
+ */
+function webform_assorted_grid_get_fieldset_components($node)
+{ 
+  $components = $node->webform['components'];
+  $pid = 0;
+  $pids = array();
+  $child_elements = array();
+  foreach($components as $component)
+  {
+    if($component['type'] == 'fieldset')
+    {
+      $pid = $component['cid'];
+      $pids[] = $pid;
+    } 
+  }
+  foreach($components as $component)
+  {
+    if(in_array($component['pid'], $pids))
+    {
+      $child_elements[] = $component;     
+    }   
+  }    
+  return $child_elements;
+}
+
+/**
+ * 
+ * Submitting fieldset value with index value.
+ */
+function webform_assorted_grid_fieldset_form_submit($form, &$form_state) 
+{
+  $fields = $form_state['values']['submitted'];  
+  $form_submitted = $form['submitted'];
+  $fieldset_arrays = array();
+  foreach ($form_submitted as $sub_name => $submitted) {
+    if(strpos($sub_name,'#') !== 0) {
+      if($submitted['#type'] == 'fieldset') {
+        $fieldset_arrays[] = $sub_name;
+      }
+    }
+  }
+  foreach ($fields as $name => $array_value) {
+    if(in_array($name, $fieldset_arrays)) {
+      foreach ($array_value as $index => $field) {
+        foreach ($field as $form_key => $value) { 
+          $form_state['values']['submitted'][$name][$form_key][$index] = $value;                  
+        }
+        unset($form_state['values']['submitted'][$name][$index]);     
+      }       
+    }         
+  }
+}
+
+/**
+ * 
+ * Implementation of hook_form_alter().
+ */
+function  webform_assorted_grid_form_alter(&$form, &$form_state, $form_id) {
+  if(preg_match('/webform_client_form/', $form_id)) {
+    $node = $form['#node'];   
+    $child_components = webform_assorted_grid_get_fieldset_components($node);
+    $i = 0;
+    foreach($form['submitted'] as $key => $value) {
+      if($value['#type'] == 'fieldset') {
+        $pid = 0; 
+        foreach($child_components as $child_component)
+        {
+          $b = 0;
+          $form_key = $child_component['form_key'];     
+          $render = '_webform_render_' . $child_component['type']; 
+          if($pid == 0 || $child_component['pid'] == $pid) {
+            $form['submitted'][$key][$i][$form_key] = $render($child_component);
+            $form['submitted'][$key][$i][$form_key]['#webform_component'] = $child_component;
+            $form['submitted'][$key][$form_key] = ''; 
+            $pid = $child_component['pid'];
+          }
+          else {
+            break;
+          }
+          $child_components = array_slice($child_components, 1);
+        }
+          
+      }         
+    }
+    $form['#submit'] = array('webform_assorted_grid_fieldset_form_submit','webform_client_form_pages', 'webform_client_form_submit');
+  }
+}
+
+?>

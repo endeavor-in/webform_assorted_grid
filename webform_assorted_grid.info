@@ -1,0 +1,4 @@
+name = Webform Assorted Grid
+description = Provides a grid display for webform fieldset fields.
+core = 7.x
+dependencies[] = webform
